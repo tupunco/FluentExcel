@@ -1,6 +1,6 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved.
 
-namespace Arch.FluentExcel
+namespace FluentExcel
 {
     using System;
     using System.Collections.Generic;
@@ -26,6 +26,8 @@ namespace Arch.FluentExcel
     /// </summary>
     public static class Excel
     {
+        private static IFormulaEvaluator _formulaEvaluator;
+
         /// <summary>
         /// Gets or sets the setting.
         /// </summary>
@@ -58,7 +60,7 @@ namespace Arch.FluentExcel
 
             bool fluentConfigEnabled = false;
             // get the fluent config
-            if (Excel.Setting.FluentConfigs.TryGetValue(typeof(T), out var fluentConfig))
+            if (Setting.FluentConfigs.TryGetValue(typeof(T), out var fluentConfig))
             {
                 fluentConfigEnabled = true;
             }
@@ -67,22 +69,14 @@ namespace Arch.FluentExcel
             for (var j = 0; j < properties.Length; j++)
             {
                 var property = properties[j];
-                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property, out var pc))
+                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property.Name, out var pc))
                 {
                     // fluent configure first(Hight Priority)
                     cellConfigs[j] = pc.CellConfig;
                 }
                 else
                 {
-                    var attrs = property.GetCustomAttributes(typeof(ColumnAttribute), true) as ColumnAttribute[];
-                    if (attrs != null && attrs.Length > 0)
-                    {
-                        cellConfigs[j] = attrs[0].CellConfig;
-                    }
-                    else
-                    {
-                        cellConfigs[j] = null;
-                    }
+                    cellConfigs[j] = null;
                 }
             }
 
@@ -90,17 +84,6 @@ namespace Arch.FluentExcel
             if (fluentConfigEnabled)
             {
                 statistics.AddRange(fluentConfig.StatisticsConfigs);
-            }
-            else
-            {
-                var attributes = typeof(T).GetCustomAttributes(typeof(StatisticsAttribute), true) as StatisticsAttribute[];
-                if (attributes != null && attributes.Length > 0)
-                {
-                    foreach (var item in attributes)
-                    {
-                        statistics.Add(item.StatisticsConfig);
-                    }
-                }
             }
 
             var list = new List<T>();
@@ -133,6 +116,9 @@ namespace Arch.FluentExcel
                     var config = cellConfigs[i];
                     if (config != null)
                     {
+                        if (config.IsImportIgnored)
+                            continue;
+
                         index = config.Index;
 
                         // Try to autodiscover index from title and cache
@@ -162,7 +148,7 @@ namespace Arch.FluentExcel
                         }
                     }
 
-                    var value = row.GetCellValue(index);
+                    var value = row.GetCellValue(index, _formulaEvaluator);
                     if (valueConverter != null)
                     {
                         value = valueConverter(row.RowNum, index, value);
@@ -188,7 +174,7 @@ namespace Arch.FluentExcel
                     }
 
                     // property type
-                    var propType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                    var propType = prop.PropertyType.UnwrapNullableType();
 
                     var safeValue = Convert.ChangeType(value, propType, CultureInfo.CurrentCulture);
 
@@ -204,7 +190,7 @@ namespace Arch.FluentExcel
             return list;
         }
 
-        internal static object GetCellValue(this IRow row, int index)
+        internal static object GetCellValue(this IRow row, int index, IFormulaEvaluator eval = null)
         {
             var cell = row.GetCell(index);
             if (cell == null)
@@ -212,28 +198,39 @@ namespace Arch.FluentExcel
                 return null;
             }
 
+            return cell.GetCellValue(eval);
+        }
+
+        internal static object GetCellValue(this ICell cell, IFormulaEvaluator eval = null)
+        {
             if (cell.IsMergedCell)
             {
                 // what can I do here?
-
             }
 
             switch (cell.CellType)
             {
-                // This is a trick to get the correct value of the cell.
-                // NumericCellValue will return a numeric value no matter the cell value is a date or a number.
                 case CellType.Numeric:
-                    return cell.ToString();
+                    if (DateUtil.IsCellDateFormatted(cell))
+                    {
+                        return cell.DateCellValue;
+                    }
+                    else
+                    {
+                        return cell.NumericCellValue;
+                    }
                 case CellType.String:
                     return cell.StringCellValue;
                 case CellType.Boolean:
                     return cell.BooleanCellValue;
                 case CellType.Error:
-                    return cell.ErrorCellValue;
+                    return FormulaError.ForInt(cell.ErrorCellValue).String;
 
-                // how?
                 case CellType.Formula:
-                    return cell.ToString();
+                    if (eval != null)
+                        return GetCellValue(eval.EvaluateInCell(cell));
+                    else
+                        return cell.CellFormula;
 
                 case CellType.Blank:
                 case CellType.Unknown:
@@ -258,14 +255,22 @@ namespace Arch.FluentExcel
             {
                 using (var file = new FileStream(excelFile, FileMode.Open, FileAccess.Read))
                 {
-                    return new HSSFWorkbook(file);
+                    var workbook = new HSSFWorkbook(file);
+
+                    _formulaEvaluator = new HSSFFormulaEvaluator(workbook);
+
+                    return workbook;
                 }
             }
             else if (Path.GetExtension(excelFile).Equals(".xlsx"))
             {
                 using (var file = new FileStream(excelFile, FileMode.Open, FileAccess.Read))
                 {
-                    return new XSSFWorkbook(file);
+                    var workbook = new XSSFWorkbook(file);
+
+                    _formulaEvaluator = new XSSFFormulaEvaluator(workbook);
+
+                    return workbook;
                 }
             }
             else

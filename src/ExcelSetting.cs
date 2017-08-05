@@ -1,6 +1,6 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved.
 
-namespace Arch.FluentExcel
+namespace FluentExcel
 {
     using System;
     using System.Collections.Generic;
@@ -23,7 +23,7 @@ namespace Arch.FluentExcel
         /// <summary>
         /// Gets or sets the subject property of the generated excel file.
         /// </summary>
-        public string Subject { get; set; } = "The extensions of NPOI, which provides IEnumerable<T>; save to and load from excel.";
+        public string Subject { get; set; } = "The extensions of NPOI, which provides IEnumerable<T> has save to and load from excel functionalities.";
 
         /// <summary>
         /// Gets or sets a value indicating whether to use *.xlsx file extension.
@@ -31,23 +31,22 @@ namespace Arch.FluentExcel
         public bool UserXlsx { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets the date time formatter.
-        /// </summary>
-        [Obsolete("This configuration doesn't work now, please using fluent api or attribute to configure this.", true)]
-        public string DateFormatter { get; set; } = "yyyy-MM-dd HH:mm:ss";
-
-        /// <summary>
         /// Gets the fluent configuration entry point for the specified <typeparamref name="TModel"/>.
         /// </summary>
-        /// <returns>The <see cref="FluentConfiguration{TModel}"/>.</returns>
         /// <typeparam name="TModel">The type of the model.</typeparam>
-        public FluentConfiguration<TModel> For<TModel>() where TModel : class
+        /// <param name="refreshCache"><c>True</c> if to refresh cache, ortherwise, <c>false</c>.</param>
+        /// <returns>The <see cref="FluentConfiguration{TModel}"/>.</returns>
+        public FluentConfiguration<TModel> For<TModel>(bool refreshCache = false) where TModel : class
         {
-            var mc = new FluentConfiguration<TModel>();
+            var type = typeof(TModel);
+            if (!FluentConfigs.TryGetValue(type, out var mc) || refreshCache)
+            {
+                mc = new FluentConfiguration<TModel>();
 
-            FluentConfigs[typeof(TModel)] = mc;
+                FluentConfigs[type] = mc;
+            }
 
-            return mc;
+            return mc as FluentConfiguration<TModel>;
         }
 
         /// <summary>

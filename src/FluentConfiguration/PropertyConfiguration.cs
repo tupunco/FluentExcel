@@ -1,6 +1,6 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved
 
-namespace Arch.FluentExcel
+namespace FluentExcel
 {
     /// <summary>
     /// Represents the configuration for the specfidied property.
@@ -27,11 +27,12 @@ namespace Arch.FluentExcel
         /// <returns>The <see cref="PropertyConfiguration"/>.</returns>
         /// <param name="index">The excel cell index.</param>
         /// <remarks>
-        /// If index was not set and AutoIndex is true Arch.FluentExcel will try to autodiscover the column index by its title setting.
+        /// If index was not set and AutoIndex is true FluentExcel will try to autodiscover the column index by its title setting.
         /// </remarks>
         public PropertyConfiguration HasExcelIndex(int index)
         {
             CellConfig.Index = index;
+            CellConfig.AutoIndex = false;
 
             return this;
         }
@@ -71,11 +72,12 @@ namespace Arch.FluentExcel
         /// </summary>
         /// <returns>The <see cref="PropertyConfiguration"/>.</returns>
         /// <remarks>
-        /// If index was not set and AutoIndex is true Arch.FluentExcel will try to autodiscover the column index by its title setting.
+        /// If index was not set and AutoIndex is true FluentExcel will try to autodiscover the column index by its title setting.
         /// </remarks>
         public PropertyConfiguration HasAutoIndex()
         {
             CellConfig.AutoIndex = true;
+            CellConfig.Index = -1;
 
             return this;
         }
@@ -92,11 +94,33 @@ namespace Arch.FluentExcel
         }
 
         /// <summary>
-        /// Configures whether to ignore the specified property.
+        /// Configures whether to ignore the specified property when exporting or importing.
         /// </summary>
-        public void IsIgnored()
+        /// <param name="exportingIsIgnored">If set to <c>true</c> exporting is ignored.</param>
+        /// <param name="importingIsIgnored">If set to <c>true</c> importing is ignored.</param>
+        public PropertyConfiguration IsIgnored(bool exportingIsIgnored, bool importingIsIgnored)
         {
-            CellConfig.IsIgnored = true;
+            CellConfig.IsExportIgnored = exportingIsIgnored;
+            CellConfig.IsImportIgnored = importingIsIgnored;
+
+            return this;
+        }
+
+        /// <summary>
+        /// Configures whether to ignore the specified property when exporting or importing.
+        /// </summary>
+        /// <param name="index">The excel cell index.</param>
+        /// <param name="title">The excel cell title (fist row).</param>
+        /// <param name="formatter">The formatter will be used for formatting the value.</param>
+        /// <param name="exportingIsIgnored">If set to <c>true</c> exporting is ignored.</param>
+        /// <param name="importingIsIgnored">If set to <c>true</c> importing is ignored.</param>
+        public void IsIgnored(int index, string title, string formatter = null, bool exportingIsIgnored = true, bool importingIsIgnored = true)
+        {
+            CellConfig.Index = index;
+            CellConfig.Title = title;
+            CellConfig.Formatter = formatter;
+            CellConfig.IsExportIgnored = exportingIsIgnored;
+            CellConfig.IsImportIgnored = importingIsIgnored;
         }
 
         /// <summary>
@@ -106,7 +130,7 @@ namespace Arch.FluentExcel
         /// <param name="title">The excel cell title (fist row).</param>
         /// <param name="formatter">The formatter will be used for formatting the value.</param>
         /// <param name="allowMerge">If set to <c>true</c> allow merge the same value cells.</param>
-        public void HasExcelCell(int index, string title, string formatter, bool allowMerge)
+        public void HasExcelCell(int index, string title, string formatter = null, bool allowMerge = false)
         {
             CellConfig.Index = index;
             CellConfig.Title = title;
@@ -116,7 +140,7 @@ namespace Arch.FluentExcel
         }
 
         /// <summary>
-        /// Configures the excel cell for the property. This method will try to autodiscover the column index by its <paramref name="title"/>
+        /// Configures the excel cell for the property with index autodiscover. This method will try to autodiscover the column index by its <paramref name="title"/>
         /// </summary>
         /// <param name="title">The excel cell title (fist row).</param>
         /// <param name="formatter">The formatter will be used for formatting the value.</param>
@@ -124,7 +148,7 @@ namespace Arch.FluentExcel
         /// <remarks>
         /// This method will try to autodiscover the column index by its <paramref name="title"/>
         /// </remarks>
-        public void HasExcelCell(string title, string formatter, bool allowMerge)
+        public void HasAutoIndexExcelCell(string title, string formatter = null, bool allowMerge = false)
         {
             CellConfig.Index = -1;
             CellConfig.Title = title;

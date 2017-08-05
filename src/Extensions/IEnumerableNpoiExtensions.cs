@@ -1,6 +1,6 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved.
 
-namespace Arch.FluentExcel
+namespace FluentExcel
 {
     using System;
     using System.Collections.Generic;
@@ -20,6 +20,8 @@ namespace Arch.FluentExcel
     /// </summary>
     public static class IEnumerableNpoiExtensions
     {
+        private static IFormulaEvaluator _formulaEvaluator;
+
         public static byte[] ToExcelContent<T>(this IEnumerable<T> source, string sheetName = "sheet0")
         {
             if (source == null)
@@ -84,22 +86,14 @@ namespace Arch.FluentExcel
                 var property = properties[j];
 
                 // get the property config
-                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property, out var pc))
+                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property.Name, out var pc))
                 {
                     // fluent configure first(Hight Priority)
                     cellConfigs[j] = pc.CellConfig;
                 }
                 else
                 {
-                    var attrs = property.GetCustomAttributes(typeof(ColumnAttribute), true) as ColumnAttribute[];
-                    if (attrs != null && attrs.Length > 0)
-                    {
-                        cellConfigs[j] = attrs[0].CellConfig;
-                    }
-                    else
-                    {
-                        cellConfigs[j] = null;
-                    }
+                    cellConfigs[j] = null;
                 }
             }
 
@@ -107,7 +101,16 @@ namespace Arch.FluentExcel
             var workbook = InitializeWorkbook(excelFile);
 
             // new sheet
-            var sheet = workbook.CreateSheet(sheetName);
+            var sheet = workbook.GetSheet(sheetName);
+            if (sheet == null)
+            {
+                sheet = workbook.CreateSheet(sheetName);
+            }
+            else
+            {
+                // doesn't override the exist sheet
+                sheet = workbook.CreateSheet();
+            }
 
             // cache cell styles
             var cellStyles = new Dictionary<int, ICellStyle>();
@@ -133,7 +136,7 @@ namespace Arch.FluentExcel
                     var config = cellConfigs[i];
                     if (config != null)
                     {
-                        if (config.IsIgnored)
+                        if (config.IsExportIgnored)
                             continue;
 
                         index = config.Index;
@@ -181,33 +184,26 @@ namespace Arch.FluentExcel
                     if (cellStyles.TryGetValue(i, out var cellStyle))
                     {
                         cell.CellStyle = cellStyle;
-
-                        var unwrapType = property.PropertyType.UnwrapNullableType();
-                        if (unwrapType == typeof(bool))
-                        {
-                            cell.SetCellValue((bool)value);
-                        }
-                        else if (unwrapType == typeof(DateTime))
-                        {
-                            cell.SetCellValue(Convert.ToDateTime(value));
-                        }
-                        else if (unwrapType == typeof(double))
-                        {
-                            cell.SetCellValue(Convert.ToDouble(value));
-                        }
-                        else if (value is IFormattable)
-                        {
-                            var fv = value as IFormattable;
-                            cell.SetCellValue(fv.ToString(config.Formatter, CultureInfo.CurrentCulture));
-                        }
-                        else
-                        {
-                            cell.SetCellValue(value.ToString());
-                        }
                     }
-                    else if (value is IFormattable)
+
+                    var unwrapType = property.PropertyType.UnwrapNullableType();
+                    if (unwrapType == typeof(bool))
                     {
-                        var fv = value as IFormattable;
+                        cell.SetCellValue((bool)value);
+                    }
+                    else if (unwrapType == typeof(DateTime))
+                    {
+                        cell.SetCellValue(Convert.ToDateTime(value));
+                    }
+                    else if (unwrapType.IsInteger()
+                            || unwrapType == typeof(decimal)
+                            || unwrapType == typeof(double)
+                            || unwrapType == typeof(float))
+                    {
+                        cell.SetCellValue(Convert.ToDouble(value));
+                    }
+                    else if (!string.IsNullOrEmpty(config.Formatter) && value is IFormattable fv)
+                    {
                         cell.SetCellValue(fv.ToString(config.Formatter, CultureInfo.CurrentCulture));
                     }
                     else
@@ -233,7 +229,7 @@ namespace Arch.FluentExcel
                     int rowspan = 0, row = 1;
                     for (row = 1; row < rowIndex; row++)
                     {
-                        var value = sheet.GetRow(row).GetCellValue(config.Index);
+                        var value = sheet.GetRow(row).GetCellValue(config.Index, _formulaEvaluator);
                         if (object.Equals(previous, value) && value != null)
                         {
                             rowspan++;
@@ -259,46 +255,11 @@ namespace Arch.FluentExcel
                 }
             }
 
-            if (rowIndex > 1)
+            if (rowIndex > 1 && fluentConfigEnabled)
             {
-                var statistics = new List<StatisticsConfig>();
-                var filterConfigs = new List<FilterConfig>();
-                var freezeConfigs = new List<FreezeConfig>();
-                if (fluentConfigEnabled)
-                {
-                    statistics.AddRange(fluentConfig.StatisticsConfigs);
-                    freezeConfigs.AddRange(fluentConfig.FreezeConfigs);
-                    filterConfigs.AddRange(fluentConfig.FilterConfigs);
-                }
-                else
-                {
-                    var attributes = typeof(T).GetCustomAttributes(typeof(StatisticsAttribute), true) as StatisticsAttribute[];
-                    if (attributes != null && attributes.Length > 0)
-                    {
-                        foreach (var item in attributes)
-                        {
-                            statistics.Add(item.StatisticsConfig);
-                        }
-                    }
-
-                    var freezes = typeof(T).GetCustomAttributes(typeof(FreezeAttribute), true) as FreezeAttribute[];
-                    if (freezes != null && freezes.Length > 0)
-                    {
-                        foreach (var item in freezes)
-                        {
-                            freezeConfigs.Add(item.FreezeConfig);
-                        }
-                    }
-
-                    var filters = typeof(T).GetCustomAttributes(typeof(FilterAttribute), true) as FilterAttribute[];
-                    if (filters != null && filters.Length > 0)
-                    {
-                        foreach (var item in filters)
-                        {
-                            filterConfigs.Add(item.FilterConfig);
-                        }
-                    }
-                }
+                var statistics = fluentConfig.StatisticsConfigs;
+                var filterConfigs = fluentConfig.FilterConfigs;
+                var freezeConfigs = fluentConfig.FreezeConfigs;
 
                 // statistics row
                 foreach (var item in statistics)
@@ -346,12 +307,20 @@ namespace Arch.FluentExcel
                 {
                     using (var file = new FileStream(excelFile, FileMode.Open, FileAccess.Read))
                     {
-                        return new XSSFWorkbook(file);
+                        var workbook = new XSSFWorkbook(file);
+
+                        _formulaEvaluator = new XSSFFormulaEvaluator(workbook);
+
+                        return workbook;
                     }
                 }
                 else
                 {
-                    return new XSSFWorkbook();
+                    var workbook = new XSSFWorkbook();
+
+                    _formulaEvaluator = new XSSFFormulaEvaluator(workbook);
+
+                    return workbook;
                 }
             }
             else
@@ -360,23 +329,29 @@ namespace Arch.FluentExcel
                 {
                     using (var file = new FileStream(excelFile, FileMode.Open, FileAccess.Read))
                     {
-                        return new HSSFWorkbook(file);
+                        var workbook = new HSSFWorkbook(file);
+
+                        _formulaEvaluator = new HSSFFormulaEvaluator(workbook);
+
+                        return workbook;
                     }
                 }
                 else
                 {
-                    var hssf = new HSSFWorkbook();
+                    var workbook = new HSSFWorkbook();
+
+                    _formulaEvaluator = new HSSFFormulaEvaluator(workbook);
 
                     var dsi = PropertySetFactory.CreateDocumentSummaryInformation();
                     dsi.Company = setting.Company;
-                    hssf.DocumentSummaryInformation = dsi;
+                    workbook.DocumentSummaryInformation = dsi;
 
                     var si = PropertySetFactory.CreateSummaryInformation();
                     si.Author = setting.Author;
                     si.Subject = setting.Subject;
-                    hssf.SummaryInformation = si;
+                    workbook.SummaryInformation = si;
 
-                    return hssf;
+                    return workbook;
                 }
             }
         }

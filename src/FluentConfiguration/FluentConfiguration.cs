@@ -1,6 +1,6 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved.
 
-namespace Arch.FluentExcel
+namespace FluentExcel
 {
     using System;
     using System.Collections.Generic;
@@ -13,7 +13,7 @@ namespace Arch.FluentExcel
     /// <typeparam name="TModel">The type of model.</typeparam>
     public class FluentConfiguration<TModel> : IFluentConfiguration where TModel : class
     {
-        private IDictionary<PropertyInfo, PropertyConfiguration> _propertyConfigs;
+        private IDictionary<string, PropertyConfiguration> _propertyConfigs;
         private IList<StatisticsConfig> _statisticsConfigs;
         private IList<FilterConfig> _filterConfigs;
         private IList<FreezeConfig> _freezeConfigs;
@@ -23,7 +23,7 @@ namespace Arch.FluentExcel
         /// </summary>
         public FluentConfiguration()
         {
-            _propertyConfigs = new Dictionary<PropertyInfo, PropertyConfiguration>();
+            _propertyConfigs = new Dictionary<string, PropertyConfiguration>();
             _statisticsConfigs = new List<StatisticsConfig>();
             _filterConfigs = new List<FilterConfig>();
             _freezeConfigs = new List<FreezeConfig>();
@@ -33,7 +33,7 @@ namespace Arch.FluentExcel
         /// Gets the property configs.
         /// </summary>
         /// <value>The property configs.</value>
-        IDictionary<PropertyInfo, PropertyConfiguration> IFluentConfiguration.PropertyConfigs
+        IDictionary<string, PropertyConfiguration> IFluentConfiguration.PropertyConfigs
         {
             get
             {
@@ -85,11 +85,13 @@ namespace Arch.FluentExcel
         /// <typeparam name="TProperty">The type of parameter.</typeparam>
         public PropertyConfiguration Property<TProperty>(Expression<Func<TModel, TProperty>> propertyExpression)
         {
-            var pc = new PropertyConfiguration();
-
             var propertyInfo = GetPropertyInfo(propertyExpression);
 
-            _propertyConfigs[propertyInfo] = pc;
+            if (!_propertyConfigs.TryGetValue(propertyInfo.Name, out var pc))
+            {
+                pc = new PropertyConfiguration();
+                _propertyConfigs[propertyInfo.Name] = pc;
+            }
 
             return pc;
         }

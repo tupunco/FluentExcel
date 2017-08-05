@@ -1,6 +1,6 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved.
 
-namespace Arch.FluentExcel
+namespace FluentExcel
 {
     /// <summary>
     /// Represents the excel cell configuration for the specified model's property.
@@ -16,7 +16,7 @@ namespace Arch.FluentExcel
         public string Title { get; set; }
 
         /// <summary>
-        /// If <see cref="Index"/> was not set and AutoIndex is true Arch.FluentExcel will try to autodiscover the column index by its <see cref="Title"/> property.
+        /// If <see cref="Index"/> was not set and AutoIndex is true FluentExcel will try to autodiscover the column index by its <see cref="Title"/> property.
         /// </summary>
         public bool AutoIndex { get; set; }
 
@@ -32,10 +32,16 @@ namespace Arch.FluentExcel
         public bool AllowMerge { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether this value of the property is ignored.
+        /// Gets or sets a value indicating whether this value of the property is ignored when exporting.
         /// </summary>
         /// <value><c>true</c> if is ignored; otherwise, <c>false</c>.</value>
-        public bool IsIgnored { get; set; }
+        public bool IsExportIgnored { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether this value of the property is ignored when importing.
+        /// </summary>
+        /// <value><c>true</c> if is ignored; otherwise, <c>false</c>.</value>
+        public bool IsImportIgnored { get; set; }
 
         /// <summary>
         /// Gets or sets the formatter for formatting the value.
