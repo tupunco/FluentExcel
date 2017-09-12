@@ -59,8 +59,9 @@ namespace FluentExcel
             var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty);
 
             bool fluentConfigEnabled = false;
+            IFluentConfiguration fluentConfig = null;
             // get the fluent config
-            if (Setting.FluentConfigs.TryGetValue(typeof(T), out var fluentConfig))
+            if (Setting.FluentConfigs.TryGetValue(typeof(T), out fluentConfig))
             {
                 fluentConfigEnabled = true;
             }
@@ -69,7 +70,8 @@ namespace FluentExcel
             for (var j = 0; j < properties.Length; j++)
             {
                 var property = properties[j];
-                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property.Name, out var pc))
+                PropertyConfiguration pc = null;
+                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property.Name, out pc))
                 {
                     // fluent configure first(Hight Priority)
                     cellConfigs[j] = pc.CellConfig;

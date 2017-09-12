@@ -75,7 +75,8 @@ namespace FluentExcel
 
             bool fluentConfigEnabled = false;
             // get the fluent config
-            if (Excel.Setting.FluentConfigs.TryGetValue(typeof(T), out var fluentConfig))
+            IFluentConfiguration fluentConfig = null;
+            if (Excel.Setting.FluentConfigs.TryGetValue(typeof(T), out fluentConfig))
             {
                 fluentConfigEnabled = true;
             }
@@ -87,7 +88,8 @@ namespace FluentExcel
                 var property = properties[j];
 
                 // get the property config
-                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property.Name, out var pc))
+                PropertyConfiguration pc = null;
+                if (fluentConfigEnabled && fluentConfig.PropertyConfigs.TryGetValue(property.Name, out pc))
                 {
                     cellConfigs[j] = pc.CellConfig;
                 }
@@ -140,6 +142,8 @@ namespace FluentExcel
                             continue;
 
                         index = config.Index;
+                        if (index < 0 && !config.AutoIndex)
+                            throw new ArgumentNullException("config.Index");
                     }
 
                     // this is the first time.
@@ -181,13 +185,25 @@ namespace FluentExcel
                         continue;
 
                     var cell = row.CreateCell(index);
-                    if (cellStyles.TryGetValue(i, out var cellStyle))
+                    ICellStyle cellStyle = null;
+                    if (cellStyles.TryGetValue(i, out cellStyle))
                     {
                         cell.CellStyle = cellStyle;
                     }
 
                     var unwrapType = property.PropertyType.UnwrapNullableType();
-                    if (unwrapType == typeof(bool))
+                    if (config.Convert != null)
+                    {
+                        value = config.Convert(value);
+                        unwrapType = value.GetType();
+                    }
+
+                    if (!string.IsNullOrEmpty(config.Formatter) && value is IFormattable)
+                    {
+                        var fv = value as IFormattable;
+                        cell.SetCellValue(fv.ToString(config.Formatter, CultureInfo.CurrentCulture));
+                    }
+                    else if (unwrapType == typeof(bool))
                     {
                         cell.SetCellValue((bool)value);
                     }
@@ -201,10 +217,6 @@ namespace FluentExcel
                             || unwrapType == typeof(float))
                     {
                         cell.SetCellValue(Convert.ToDouble(value));
-                    }
-                    else if (!string.IsNullOrEmpty(config.Formatter) && value is IFormattable fv)
-                    {
-                        cell.SetCellValue(fv.ToString(config.Formatter, CultureInfo.CurrentCulture));
                     }
                     else
                     {
@@ -271,11 +283,11 @@ namespace FluentExcel
                     {
                         cell = lastRow.CreateCell(column);
 
-						// set the same cell style
-						cell.CellStyle = sheet.GetRow(rowIndex - 1)?.GetCell(column)?.CellStyle;
+                        // set the same cell style
+                        cell.CellStyle = sheet.GetRow(rowIndex - 1)?.GetCell(column)?.CellStyle;
 
                         // set the cell formula
-						cell.CellFormula = $"{item.Formula}({GetCellPosition(1, column)}:{GetCellPosition(rowIndex - 1, column)})";
+                        cell.CellFormula = $"{item.Formula}({GetCellPosition(1, column)}:{GetCellPosition(rowIndex - 1, column)})";
                     }
 
                     rowIndex++;

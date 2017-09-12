@@ -4,6 +4,8 @@ namespace FluentExcel
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel.DataAnnotations;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Reflection;
 
@@ -14,6 +16,7 @@ namespace FluentExcel
     public class FluentConfiguration<TModel> : IFluentConfiguration where TModel : class
     {
         private IDictionary<string, PropertyConfiguration> _propertyConfigs;
+        private IList<PropertyInfo> _propertyInfo;
         private IList<StatisticsConfig> _statisticsConfigs;
         private IList<FilterConfig> _filterConfigs;
         private IList<FreezeConfig> _freezeConfigs;
@@ -23,6 +26,9 @@ namespace FluentExcel
         /// </summary>
         public FluentConfiguration()
         {
+            var mType = typeof(TModel);
+            _propertyInfo = mType.GetProperties();
+
             _propertyConfigs = new Dictionary<string, PropertyConfiguration>();
             _statisticsConfigs = new List<StatisticsConfig>();
             _filterConfigs = new List<FilterConfig>();
@@ -87,11 +93,119 @@ namespace FluentExcel
         {
             var propertyInfo = GetPropertyInfo(propertyExpression);
 
-            if (!_propertyConfigs.TryGetValue(propertyInfo.Name, out var pc))
+            PropertyConfiguration pc = null;
+            if (!_propertyConfigs.TryGetValue(propertyInfo.Name, out pc))
             {
                 pc = new PropertyConfiguration();
                 _propertyConfigs[propertyInfo.Name] = pc;
             }
+
+            return pc;
+        }
+
+        /// <summary>
+        /// From Annotations
+        /// </summary>
+        /// <typeparam name="TModel"></typeparam>
+        /// <param name="fc"></param>
+        public FluentConfiguration<TModel> SetIgnore(params Expression<Func<TModel, object>>[] propertyExpressions)
+        {
+            if (propertyExpressions == null)
+                return this;
+
+            foreach (var propertyExpression in propertyExpressions)
+            {
+                var propertyInfo = GetPropertyInfo(propertyExpression);
+                PropertyConfiguration pc = null;
+                if (_propertyConfigs.TryGetValue(propertyInfo.Name, out pc))
+                    pc.IsIgnored(true, true);
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        /// Auto Gen Index
+        /// </summary>
+        public void AutoIndex()
+        {
+            var config = _propertyConfigs;
+            var mType = typeof(TModel);
+            var index = 0;
+
+            PropertyConfiguration pc = null;
+            CellConfig cc = null;
+            foreach (var prop in _propertyInfo)
+            {
+                if (!_propertyConfigs.TryGetValue(prop.Name, out pc))
+                    continue;
+
+                cc = pc.CellConfig;
+                if (cc.IsExportIgnored || !cc.AutoIndex)
+                    continue;
+
+                while (_propertyConfigs.Values.Any(x => x.CellConfig.Index == index))
+                {
+                    index++;
+                }
+
+                pc.HasExcelIndex(index);
+                index++;
+            }
+        }
+
+        /// <summary>
+        /// From Annotations
+        /// </summary>
+        /// <typeparam name="TModel"></typeparam>
+        /// <param name="fc"></param>
+        public FluentConfiguration<TModel> FromAnnotations()
+        {
+            var pConfig = this._propertyConfigs;
+            foreach (var prop in _propertyInfo)
+            {
+                SetPropertyFromDisplay(prop, pConfig);
+            }
+            return this;
+        }
+
+        /// <summary>
+        /// Set Property From DisplayAttribute
+        /// </summary>
+        /// <param name="property"></param>
+        /// <returns></returns>
+        private static PropertyConfiguration SetPropertyFromDisplay(PropertyInfo propertyInfo,
+            IDictionary<string, PropertyConfiguration> _propertyConfigs)
+        {
+            var display = propertyInfo.GetCustomAttribute<DisplayAttribute>();
+            var displayFormat = propertyInfo.GetCustomAttribute<DisplayFormatAttribute>();
+            PropertyConfiguration pc = null;
+            if (!_propertyConfigs.TryGetValue(propertyInfo.Name, out pc))
+            {
+                pc = new PropertyConfiguration();
+                _propertyConfigs[propertyInfo.Name] = pc;
+            }
+
+            if (display != null)
+            {
+                pc.HasExcelTitle(display.Name);
+                if (display.GetOrder().HasValue)
+                    pc.HasExcelIndex(display.Order);
+            }
+            else
+            {
+                pc.HasExcelTitle(propertyInfo.Name);
+            }
+
+            if (displayFormat != null)
+            {
+                pc.HasDataFormatter(displayFormat.DataFormatString
+                                                 .Replace("{0:", "")
+                                                 .Replace("}", ""));
+            }
+
+            if (pc.CellConfig.Index < 0)
+                pc.HasAutoIndex();
 
             return pc;
         }
@@ -102,7 +216,7 @@ namespace FluentExcel
         /// <returns>The <see cref="FluentConfiguration{TModel}"/>.</returns>
         /// <param name="name">The statistics name. (e.g. Total). In current version, the default name location is (last row, first cell)</param>
         /// <param name="formula">The cell formula, such as SUM, AVERAGE and so on, which applyable for vertical statistics..</param>
-        /// <param name="columnIndexes">The column indexes for statistics. if <paramref name="formula"/>is SUM, and <paramref name="columnIndexes"/> is [1,3], 
+        /// <param name="columnIndexes">The column indexes for statistics. if <paramref name="formula"/>is SUM, and <paramref name="columnIndexes"/> is [1,3],
         /// for example, the column No. 1 and 3 will be SUM for first row to last row.</param>
         public FluentConfiguration<TModel> HasStatistics(string name, string formula, params int[] columnIndexes)
         {

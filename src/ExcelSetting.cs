@@ -39,7 +39,8 @@ namespace FluentExcel
         public FluentConfiguration<TModel> For<TModel>(bool refreshCache = false) where TModel : class
         {
             var type = typeof(TModel);
-            if (!FluentConfigs.TryGetValue(type, out var mc) || refreshCache)
+            IFluentConfiguration mc = null;
+            if (!FluentConfigs.TryGetValue(type, out mc) || refreshCache)
             {
                 mc = new FluentConfiguration<TModel>();
 

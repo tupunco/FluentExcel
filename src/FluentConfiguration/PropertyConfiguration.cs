@@ -1,5 +1,7 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved
 
+using System;
+
 namespace FluentExcel
 {
     /// <summary>
@@ -20,6 +22,18 @@ namespace FluentExcel
         /// </summary>
         /// <value>The cell config.</value>
         internal CellConfig CellConfig { get; }
+
+        /// <summary>
+        /// Configures the excel value Convert for the property.
+        /// </summary>
+        /// <returns>The <see cref="PropertyConfiguration"/>.</returns>
+        /// <param name="convert">The excel cell value Convert</param>
+        public PropertyConfiguration HasConvert(Func<object, object> convert)
+        {
+            CellConfig.Convert = convert;
+
+            return this;
+        }
 
         /// <summary>
         /// Configures the excel cell index for the property.

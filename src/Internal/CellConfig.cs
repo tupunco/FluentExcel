@@ -1,5 +1,7 @@
 ﻿// Copyright (c) rigofunc (xuyingting). All rights reserved.
 
+using System;
+
 namespace FluentExcel
 {
     /// <summary>
@@ -18,7 +20,7 @@ namespace FluentExcel
         /// <summary>
         /// If <see cref="Index"/> was not set and AutoIndex is true FluentExcel will try to autodiscover the column index by its <see cref="Title"/> property.
         /// </summary>
-        public bool AutoIndex { get; set; }
+        public bool AutoIndex { get; set; } = true;
 
         /// <summary>
         /// Gets or sets the column index.
@@ -48,5 +50,11 @@ namespace FluentExcel
         /// </summary>
         /// <value>The formatter.</value>
         public string Formatter { get; set; }
+
+        /// <summary>
+        /// Gets or sets the Value Convert for the value.
+        /// </summary>
+        /// <see cref="Formatter"/>
+        public Func<object, object> Convert { get; set; }
     }
 }
