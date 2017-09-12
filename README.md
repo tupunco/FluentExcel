@@ -1,5 +1,17 @@
 Using `Fluent API` to configure POCO excel behaviors, and then provides IEnumerable&lt;T&gt; has save to and load from excel functionalities.
 
+# 修改内容
+- PropertyConfiguration
+  - HasConvert 功能 
+  - Convert 参数
+- IEnumerableNpoiExtensions
+  - 执行 Formatter 优先级
+  - 执行 CellConfig.Convert
+- FluentConfiguration 功能
+  - SetIgnore 批量设置忽略字段
+  - AutoIndex 自动索引
+  - FromAnnotations 从 Annotations 初始化字段
+
 # Features
 - [x] Decouple the configuration from the POCO model by using `fluent api`.
 - [x] Support none configuration POCO, so that if English is your mother language, none any more configurations;
