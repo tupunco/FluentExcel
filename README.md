@@ -2,8 +2,7 @@ Using `Fluent API` to configure POCO excel behaviors, and then provides IEnumera
 
 # 修改内容
 - PropertyConfiguration
-  - HasConvert 功能 
-  - Convert 参数
+  - HasConvert 功能, 设置 `字段转换` 器
 - IEnumerableNpoiExtensions
   - 执行 Formatter 优先级
   - 执行 CellConfig.Convert
@@ -11,6 +10,34 @@ Using `Fluent API` to configure POCO excel behaviors, and then provides IEnumera
   - SetIgnore 批量设置忽略字段
   - AutoIndex 自动索引
   - FromAnnotations 从 Annotations 初始化字段
+- 示范代码:
+```csharp
+// 学生模型
+public class Student
+{
+    [Required]
+    [Display(Name = "简历 ID")]
+    public long ID { get; set; }
+
+    /// <summary>
+    /// 性别, 0:未知, 1:男, 2:女
+    /// </summary>
+    [Required]
+    [Display(Name = "性别")]
+    public int Gender { get; set; }
+
+    public object GenderExtendData { get; set; }
+    public object AttachmentData { get; set; }
+}
+
+//配置
+var fc = Excel.Setting.For<Student>();
+var cGenderMap = new string[]{"未知", "男", "女"};
+fc.Property(x => x.Gender).HasConvert(val => cGenderMap[(int)val]));
+fc.FromAnnotations()
+    .SetIgnore(x => x.ExtendData, x => x.AttachmentData)
+    .AutoIndex();
+```
 
 # Features
 - [x] Decouple the configuration from the POCO model by using `fluent api`.
