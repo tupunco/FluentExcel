@@ -178,9 +178,16 @@ namespace FluentExcel
                     // property type
                     var propType = prop.PropertyType.UnwrapNullableType();
 
-                    var safeValue = Convert.ChangeType(value, propType, CultureInfo.CurrentCulture);
+                    try
+                    {
+                        var safeValue = Convert.ChangeType(value, propType, CultureInfo.CurrentCulture);
 
-                    prop.SetValue(item, safeValue, null);
+                        prop.SetValue(item, safeValue, null);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception(string.Format("[{0}]-[{1}]-[{2}]", ex.Message, value, propType.FullName), ex);
+                    }
                 }
 
                 if (itemIsValid)
